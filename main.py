@@ -1,146 +1,46 @@
-
-
-from dofbot import DofbotEnv
+import time
 import numpy as np
-import time
-import copy
-from scipy.spatial.transform import Rotation as R
-import time
-import math
-
+# 创建机械臂对象
+import rospy
+from dofbot_real import RealEnv
 
 if __name__ == '__main__':
-    env = DofbotEnv()
+    env = RealEnv()
     env.reset()
-    Reward = False
 
-    '''
-    constants here
-    '''
-    GRIPPER_DEFAULT_ANGLE = 20. / 180. * 3.1415
-    GRIPPER_CLOSE_ANGLE = -20. / 180. * 3.1415
+    #points代表了一系列移动时的关节状态
+    points = [
+        np.asarray([90., 90., 90., 90., 90.]), # 原始状态
+        np.asarray([136.0, 50.0, 53.0, 1.0, 86.0]), #移动到物块上方
+        np.asarray([136.0, 50.0, 53.0, 1.0, 86.0]), #夹住
+        np.asarray([136.0, 70.0, 53.0, 1.0, 86.0]), #抬起来
+        np.asarray([180 - 138.0, 70.0, 53.0, 1.0, 86.0]), #转动
+        np.asarray([180 - 138.0, 55.0, 53.0, 1.0, 86.0]), #放下
+        # np.asarray([136.0, 90.0, 53.0, 1.0, 86.0]),
+        # np.asarray([90.0, 50.0, 53.0, 1.0, 86.0]),
+        np.asarray([180 - 138.0, 65.0, 53.0, 1.0, 86.0]), #松开
+    ]
 
-    # define state machine
-    INITIAL_STATE = 0
-    GRASP_STATE = 1
-    LIFT_STATE = 2
-    PUT_STATE = 3
-    MOVE_STATE = 4
-    BACK_STATE = 5
-    current_state = INITIAL_STATE
+    #每段路径的插值点数; spilt[i] 插值 point[i] - point[i+1]
+    split = [30, 5, 30, 40, 10, 10]
+    #夹爪的角度，负值表示和上一个相同; gripper[i]对应point[i]
+    gripper = [-1, -1, 140., -1., -1, -1, 10.]
 
-    initial_jointposes = [1.57, 0., 1.57, 1.57, 1.57]
+    def linear_interpolation(src, tat, n=10):
+        """src - tat 插值n个点"""
+        path = np.linspace(src, tat, num=n)
+        return path
 
-    # offset to grasp object
-    obj_offset = [-0.023, -0.023, 0.09]
-    obj_offset2 = [-0.032, 0.032, 0.13]
-    obj_offset3 = [-0.025, 0.025, 0.09]
-
-    block_pos, block_orn = env.get_block_pose()
-
-    start_time = None
-
-    while not Reward:
-        '''
-        #获取物块位姿、目标位置和机械臂位姿，计算机器臂关节和夹爪角度，使得机械臂夹取绿色物块，放置到紫色区域。
-        '''
-
-        '''
-        code here
-        '''
-
-        if current_state == INITIAL_STATE:
-            target_pos = copy.deepcopy(block_pos)
-            #target_orn = copy.deepcopy(block_orn)
-            target_pos = (target_pos[0] + obj_offset[0], target_pos[1] + obj_offset[1], target_pos[2] + obj_offset[2])
-            
-            # eular_pos = R.from_quat(target_orn).as_euler('xyz', degrees=False)
-            # eular_pos[1] = -3.1415 / 2
-            # target_orn = R.from_euler('xyz', eular_pos).as_quat()
-
-            target_joint_state = env.dofbot_setInverseKine(target_pos, -1 * block_orn)
-            env.dofbot_control(target_joint_state, GRIPPER_DEFAULT_ANGLE)
-
-            current_joint_state, _ = env.get_dofbot_jointPoses()
-            if np.all(np.isclose(np.array(current_joint_state), np.array(target_joint_state), atol = 1e-2)):
-                current_state = GRASP_STATE
-            
-            #print(target_joint_state, current_joint_state)
-            
-        elif current_state == GRASP_STATE:
-            target_pos = copy.deepcopy(block_pos)
-            #target_orn = copy.deepcopy(block_orn)
-            target_pos = (target_pos[0] + obj_offset[0], target_pos[1] + obj_offset[1], target_pos[2] + obj_offset[2])
-
-            # eular_pos = R.from_quat(target_orn).as_euler('xyz', degrees=False)
-            # eular_pos[1] = -3.1415 / 2
-            # target_orn = R.from_euler('xyz', eular_pos).as_quat()
-
-            target_joint_state = env.dofbot_setInverseKine(target_pos, -1 * block_orn)
-            env.dofbot_control(target_joint_state, GRIPPER_CLOSE_ANGLE)
-
-            #current_joint_state, _ = env.get_dofbot_jointPoses()
-
-            if start_time is None:
-                start_time = time.time()
-                
-            current_time = time.time()
-            if (current_time - start_time > 2.0):
-                current_state = LIFT_STATE
-                start_time = None
-                
-        elif current_state == LIFT_STATE:
-            target_pos = copy.deepcopy(block_pos)
-            #target_orn = copy.deepcopy(block_orn)
-            target_pos = (target_pos[0] + obj_offset[0], target_pos[1] + obj_offset[1], target_pos[2] + obj_offset[2] + 0.05)
-
-            # eular_pos = R.from_quat(target_orn).as_euler('xyz', degrees=False)
-            # eular_pos[1] = -3.1415 / 2
-            # target_orn = R.from_euler('xyz', eular_pos).as_quat()
-
-            target_joint_state = env.dofbot_setInverseKine(target_pos, -1 * block_orn)
-            env.dofbot_control(target_joint_state, GRIPPER_CLOSE_ANGLE)
-
-            current_joint_state, _ = env.get_dofbot_jointPoses()
-            if np.all(np.isclose(np.array(current_joint_state), np.array(target_joint_state), atol = 1e-2)):
-                current_state = MOVE_STATE
-                
-        elif current_state == MOVE_STATE:
-            target_pos = env.get_target_pose()
-            target_pos = (target_pos[0] + obj_offset2[0], target_pos[1] + obj_offset2[1], block_pos[2] + obj_offset2[2])
-            #target_orn = copy.deepcopy(block_orn)
-
-            # eular_pos = R.from_quat(target_orn).as_euler('xyz', degrees=False)
-            # eular_pos[1] = -3.1415 / 2
-            # eular_pos[2] = -eular_pos[2]
-            # target_orn = R.from_euler('xyz', eular_pos).as_quat()
-
-            target_joint_state = env.dofbot_setInverseKine(target_pos, block_orn * -1)
-            env.dofbot_control(target_joint_state, GRIPPER_CLOSE_ANGLE)
-
-            current_joint_state, _ = env.get_dofbot_jointPoses()
-            if np.all(np.isclose(np.array(current_joint_state), np.array(target_joint_state), atol = 1e-2)):
-                current_state = BACK_STATE
-                
-        elif current_state == BACK_STATE:
-            target_pos = env.get_target_pose()
-            target_pos = (target_pos[0] + obj_offset3[0], target_pos[1] + obj_offset3[1], block_pos[2] + obj_offset3[2])
-            #target_orn = copy.deepcopy(block_orn)
-            
-            # eular_pos = R.from_quat(target_orn).as_euler('xyz', degrees=False)
-            # eular_pos[1] = -3.1415 / 2
-            # eular_pos[2] = -eular_pos[2]
-            # target_orn = R.from_euler('xyz', eular_pos).as_quat()
-
-            target_joint_state = env.dofbot_setInverseKine(target_pos, block_orn * -1)
-
-            if start_time is None:
-                start_time = time.time()
-            current_time = time.time()
-            if (current_time - start_time > 2.0):
-                env.dofbot_control(target_joint_state, GRIPPER_DEFAULT_ANGLE)
+    for i in range(len(points) - 1):
+        #下一阶段如果不需要夹爪，则仅移动机械臂；否则仅移动夹爪
+        if gripper[i + 1] < 0.:
+            path = linear_interpolation(points[i], points[i + 1], n=split[i])
+        else:
+            path = linear_interpolation(env.get_state()[-1], gripper[i + 1], n=split[i])
+        
+        #按照插值点控制路径
+        for p in path:
+            if gripper[i + 1] < 0.:
+                env.step(p)
             else:
-                env.dofbot_control(target_joint_state, GRIPPER_CLOSE_ANGLE)
-
-
-        Reward = env.reward()
+                env.step(gripper=p)
