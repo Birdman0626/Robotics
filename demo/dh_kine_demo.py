@@ -24,14 +24,13 @@ l4 = 0.12842            # 定义第五连杆长度
 
 dofbot = rtb.DHRobot(
     [
-        rtb.RevoluteMDH(a = 0,  alpha=0,    d=l1, offset=0),
-        rtb.RevoluteMDH(a = 0,  alpha=pi/2, d=0,  offset=pi/2),
-        rtb.RevoluteMDH(a = l2, alpha=0,    d=0,  offset=0),
-        rtb.RevoluteMDH(a = l3, alpha=0,    d=0,  offset=pi/2),
-        rtb.RevoluteMDH(a = 0,  alpha=pi/2, d=l4, offset=0)
+        rtb.RevoluteMDH(a=0,  alpha=0,    d=l1, offset=0),
+        rtb.RevoluteMDH(a=0,  alpha=pi/2, d=0,  offset=pi/2),
+        rtb.RevoluteMDH(a=l2, alpha=0,    d=0,  offset=0),
+        rtb.RevoluteMDH(a=l3, alpha=0,    d=0,  offset=pi/2),
+        rtb.RevoluteMDH(a=0,  alpha=pi/2, d=l4, offset=0)
     ]
 )
-
 # 输出机器人DH参数矩阵
 print(dofbot)
 
@@ -47,7 +46,7 @@ Part1 给出一下关节姿态时的机械臂正运动学解，并附上仿真�
 # part1 demo
 fkine_input0 = [0., pi/3, pi/4, pi/5, 0.]
 fkine_result0 = dofbot.fkine(fkine_input0)
-print(fkine_result0)
+print("demo 0:\n", fkine_result0)
 dofbot.plot(q=fkine_input0, block=True)
 
 # part1-1
@@ -109,7 +108,7 @@ target_pos0 = np.array([
     [0., 0., 0., 1.]
 ])
 ikine_result0 = dofbot.ik_LM(target_pos0)[0]
-print("ikine: ", np.array(ikine_result0))
+print("ikine 0: \n", np.array(ikine_result0))
 dofbot.plot(q=ikine_result0, block=True)
 
 
@@ -159,7 +158,7 @@ joint_limits = [
     [-pi, pi],
 ]
 
-num_sample = 500
+num_sample = 1000
 pos_array = np.zeros((num_sample,3))
 
 for index in range(num_sample):
