@@ -1,14 +1,6 @@
-@ -0,0 +1,146 @@
-
-
 from dofbot import DofbotEnv
 import numpy as np
 import time
-import copy
-from scipy.spatial.transform import Rotation as R
-import time
-import math
-
 
 if __name__ == '__main__':
     env = DofbotEnv()
@@ -23,7 +15,7 @@ if __name__ == '__main__':
 
     # define state machine
     INITIAL_STATE = 0
-    GRASP_STATE = 1
+    GRASP_STATE = 1 
     LIFT_STATE = 2
     PUT_STATE = 3
     MOVE_STATE = 4
@@ -51,97 +43,50 @@ if __name__ == '__main__':
         '''
 
         if current_state == INITIAL_STATE:
-            target_pos = copy.deepcopy(block_pos)
-            #target_orn = copy.deepcopy(block_orn)
-            target_pos = (target_pos[0] + obj_offset[0], target_pos[1] + obj_offset[1], target_pos[2] + obj_offset[2])
-            
-            # eular_pos = R.from_quat(target_orn).as_euler('xyz', degrees=False)
-            # eular_pos[1] = -3.1415 / 2
-            # target_orn = R.from_euler('xyz', eular_pos).as_quat()
-
-            target_joint_state = env.dofbot_setInverseKine(target_pos, -1 * block_orn)
-            env.dofbot_control(target_joint_state, GRIPPER_DEFAULT_ANGLE)
-
-            current_joint_state, _ = env.get_dofbot_jointPoses()
-            if np.all(np.isclose(np.array(current_joint_state), np.array(target_joint_state), atol = 1e-2)):
+            #把机械臂挪过去
+            grasp_pos = (block_pos[0] + obj_offset[0], block_pos[1] + obj_offset[1], block_pos[2] + obj_offset[2])
+            grasp_joint_pos = env.dofbot_setInverseKine(grasp_pos, -1 * block_orn)
+            env.dofbot_control(grasp_joint_pos, GRIPPER_DEFAULT_ANGLE)
+            current_joint_pos, _ = env.get_dofbot_jointPoses()
+            if np.all(np.isclose(np.array(current_joint_pos), np.array(grasp_joint_pos), atol = 1e-2)):
                 current_state = GRASP_STATE
-            
-            #print(target_joint_state, current_joint_state)
-            
-        elif current_state == GRASP_STATE:
-            target_pos = copy.deepcopy(block_pos)
-            #target_orn = copy.deepcopy(block_orn)
-            target_pos = (target_pos[0] + obj_offset[0], target_pos[1] + obj_offset[1], target_pos[2] + obj_offset[2])
-
-            # eular_pos = R.from_quat(target_orn).as_euler('xyz', degrees=False)
-            # eular_pos[1] = -3.1415 / 2
-            # target_orn = R.from_euler('xyz', eular_pos).as_quat()
-
-            target_joint_state = env.dofbot_setInverseKine(target_pos, -1 * block_orn)
-            env.dofbot_control(target_joint_state, GRIPPER_CLOSE_ANGLE)
-
-            #current_joint_state, _ = env.get_dofbot_jointPoses()
-
-            if start_time is None:
                 start_time = time.time()
-                
+         
+        elif current_state == GRASP_STATE:
+            #抓两秒
+            env.dofbot_control(grasp_joint_pos, GRIPPER_CLOSE_ANGLE)               
             current_time = time.time()
-            if (current_time - start_time > 2.0):
+            if (current_time - start_time > 2.):
                 current_state = LIFT_STATE
-                start_time = None
+                lift_pos = (block_pos[0] + obj_offset[0], block_pos[1] + obj_offset[1],
+                            block_pos[2] + obj_offset[2] + 0.02)
                 
         elif current_state == LIFT_STATE:
-            target_pos = copy.deepcopy(block_pos)
-            #target_orn = copy.deepcopy(block_orn)
-            target_pos = (target_pos[0] + obj_offset[0], target_pos[1] + obj_offset[1], target_pos[2] + obj_offset[2] + 0.05)
-
-            # eular_pos = R.from_quat(target_orn).as_euler('xyz', degrees=False)
-            # eular_pos[1] = -3.1415 / 2
-            # target_orn = R.from_euler('xyz', eular_pos).as_quat()
-
-            target_joint_state = env.dofbot_setInverseKine(target_pos, -1 * block_orn)
-            env.dofbot_control(target_joint_state, GRIPPER_CLOSE_ANGLE)
-
-            current_joint_state, _ = env.get_dofbot_jointPoses()
-            if np.all(np.isclose(np.array(current_joint_state), np.array(target_joint_state), atol = 1e-2)):
+            #稍微抬一下
+            lift_joint_pos = env.dofbot_setInverseKine(lift_pos, -1 * block_orn)
+            env.dofbot_control(lift_joint_pos, GRIPPER_CLOSE_ANGLE)
+            current_joint_pos, _ = env.get_dofbot_jointPoses()
+            if np.all(np.isclose(np.array(current_joint_pos), np.array(lift_joint_pos), atol = 1e-2)):
                 current_state = MOVE_STATE
+                target_pos = env.get_target_pose()
+                move_pos = (target_pos[0] + obj_offset2[0], target_pos[1] + obj_offset2[1], block_pos[2] + obj_offset2[2])
                 
         elif current_state == MOVE_STATE:
-            target_pos = env.get_target_pose()
-            target_pos = (target_pos[0] + obj_offset2[0], target_pos[1] + obj_offset2[1], block_pos[2] + obj_offset2[2])
-            #target_orn = copy.deepcopy(block_orn)
-
-            # eular_pos = R.from_quat(target_orn).as_euler('xyz', degrees=False)
-            # eular_pos[1] = -3.1415 / 2
-            # eular_pos[2] = -eular_pos[2]
-            # target_orn = R.from_euler('xyz', eular_pos).as_quat()
-
-            target_joint_state = env.dofbot_setInverseKine(target_pos, block_orn * -1)
-            env.dofbot_control(target_joint_state, GRIPPER_CLOSE_ANGLE)
-
-            current_joint_state, _ = env.get_dofbot_jointPoses()
-            if np.all(np.isclose(np.array(current_joint_state), np.array(target_joint_state), atol = 1e-2)):
+            #挪过去
+            move_joint_pos = env.dofbot_setInverseKine(move_pos, block_orn * -1)
+            env.dofbot_control(move_joint_pos, GRIPPER_CLOSE_ANGLE)
+            current_joint_pos, _ = env.get_dofbot_jointPoses()
+            if np.all(np.isclose(np.array(current_joint_pos), np.array(move_joint_pos), atol = 1e-2)):
                 current_state = BACK_STATE
+                back_pos = (target_pos[0] + obj_offset3[0], target_pos[1] + obj_offset3[1], block_pos[2] + obj_offset3[2])
                 
         elif current_state == BACK_STATE:
-            target_pos = env.get_target_pose()
-            target_pos = (target_pos[0] + obj_offset3[0], target_pos[1] + obj_offset3[1], block_pos[2] + obj_offset3[2])
-            #target_orn = copy.deepcopy(block_orn)
-            
-            # eular_pos = R.from_quat(target_orn).as_euler('xyz', degrees=False)
-            # eular_pos[1] = -3.1415 / 2
-            # eular_pos[2] = -eular_pos[2]
-            # target_orn = R.from_euler('xyz', eular_pos).as_quat()
-
-            target_joint_state = env.dofbot_setInverseKine(target_pos, block_orn * -1)
-
-            if start_time is None:
-                start_time = time.time()
-            current_time = time.time()
-            if (current_time - start_time > 2.0):
-                env.dofbot_control(target_joint_state, GRIPPER_DEFAULT_ANGLE)
+            #再挪过去然后松开
+            back_joint_pos = env.dofbot_setInverseKine(back_pos, block_orn * -1)
+            current_joint_pos, _ = env.get_dofbot_jointPoses()
+            if np.all(np.isclose(np.array(current_joint_pos), np.array(back_joint_pos), atol = 1e-2)):
+                env.dofbot_control(back_joint_pos, GRIPPER_DEFAULT_ANGLE)
             else:
-                env.dofbot_control(target_joint_state, GRIPPER_CLOSE_ANGLE)
-
+                env.dofbot_control(back_joint_pos, GRIPPER_CLOSE_ANGLE)
 
         Reward = env.reward()
